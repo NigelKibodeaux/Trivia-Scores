@@ -86,6 +86,10 @@ function formatScores(scores_object) {
                             text-align: left;
                             border-bottom: 1px solid #ddd;
                         }
+
+                        td:nth-child(2) {
+                            text-align: right;
+                        }
                     </style>
                 </head>
                 <body>
