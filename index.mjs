@@ -64,25 +64,39 @@ async function getScores() {
 
 // Turn the scores into an HTML table
 function formatScores(scores_object) {
-    const styles = `
-    <style>
-        body {
-            font-family: sans-serif;
-        }
+    const scores = Object.entries(scores_object)
+        .map(score => `<tr><td>${score[0]}</td><td>${score[1]}</td></tr>`)
+        .join('\n');
 
-        table {
-            border-collapse: collapse;
-            margin: auto;
-        }
+    return `<html>
+                <head>
+                    <meta name="viewport" content="width=device-width,initial-scale=1"/>
+                    <style>
+                        body {
+                            font-family: sans-serif;
+                        }
 
-        th, td {
-            padding: 10px;
-            text-align: left;
-            border-bottom: 1px solid #ddd;
-        }
-    </style>
+                        table {
+                            border-collapse: collapse;
+                            margin: auto;
+                        }
+
+                        th, td {
+                            padding: 10px;
+                            text-align: left;
+                            border-bottom: 1px solid #ddd;
+                        }
+                    </style>
+                </head>
+                <body>
+                    <table>
+                        <tr>
+                            <th>Team Name</th>
+                            <th>Score</th>
+                        </tr>
+                        ${scores}
+                    </table>
+                </body>
+            </html>
     `;
-
-    const scores = Object.entries(scores_object).map(score => `<tr><td>${score[0]}</td><td>${score[1]}</td></tr>`).join('');
-    return `${styles}<table><tr><th>Team Name</th><th>Score</th></tr>${scores}</table>`;
 }
