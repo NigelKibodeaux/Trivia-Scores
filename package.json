@@ -1,4 +1,6 @@
 {
-  "name": "trivia-scores",
-  "main": "index.mjs"
+  "scripts": {
+    "start": "node index.mjs"
+  }
+}
 }
