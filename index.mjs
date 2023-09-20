@@ -3,6 +3,12 @@ import http from 'http';
 const server = http.createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': 'text/html' });
 
+    // Favicon
+    if (req.url === '/favicon.ico') {
+        res.end();
+        return;
+    }
+
     // Get the scores and format them into an HTML table.
     const scores = await getScores();
     const formatted_scores = formatScores(scores);
@@ -30,42 +36,60 @@ async function getScores() {
         const data = rows.map(row => {
             const cells = row.match(/<td.*?>.*?<\/td>/g).map(cell => cell.replace(/<.*?>/g, ''));
             return cells.reduce((obj, cell, index) => {
-                obj[headers[index]] = cell;
+                obj.set(headers[index], cell);
                 return obj;
-            }, {});
+            }, new Map());
         });
         return data;
-    }
-    );
+    });
 
     // Add the scores together from each table for each team.
-    const scores = table_objects.reduce((obj, table) => {
+    const scores = table_objects.reduce((obj, table, index) => {
         table.forEach(row => {
-            if (obj[row['Team Name']]) {
-                obj[row['Team Name']] += parseInt(row.Score);
+            const team_name = row.get('Team Name').trim().toUpperCase();
+
+            // Filter out the duplicate "Centaur rodeo" score from the first week
+            if (team_name === 'CENTAUR RODEO' && row.get('Score') === '32') {
+                return obj;
+            }
+
+            if (obj.has(team_name)) {
+                const team_scores = obj.get(team_name);
+                team_scores.total += parseInt(row.get('Score'));
+                team_scores.rounds[index] = parseInt(row.get('Score'));
             } else {
-                obj[row['Team Name']] = parseInt(row.Score);
+                const rounds = [];
+                rounds[index] = parseInt(row.get('Score'));
+                obj.set(team_name, {
+                    total: parseInt(row.get('Score')),
+                    rounds,
+                });
             }
         });
         return obj;
-    }, {});
+    }, new Map());
 
-    // Sort the scores from highest to lowest.
-    const sorted_scores = Object.entries(scores).sort((a, b) => b[1] - a[1]);
+    // Replace the empty rounds with 0s
+    scores.forEach((value, key, map) => {
+        for (let i = 0; i < table_objects.length; i++) {
+            if (!value.rounds[i]) {
+                value.rounds[i] = 0;
+            }
+        }
+    });
 
-    // Turn it back into an object.
-    const sorted_scores_object = sorted_scores.reduce((obj, score) => {
-        obj[score[0]] = score[1];
-        return obj;
-    }, {});
-
-    return sorted_scores_object;
+    return scores;
 }
 
 // Turn the scores into an HTML table
 function formatScores(scores_object) {
-    const scores = Object.entries(scores_object)
-        .map(score => `<tr><td>${score[0]}</td><td>${score[1]}</td></tr>`)
+    const scores = [...scores_object.entries()]
+        .sort((a, b) => b[1].total - a[1].total) // sort by total score
+        .map(([team, results]) => `<tr>
+            <td>${team}</td>
+            <td class="rounds">${results.rounds.map(r => `<span>${r}</span>`)}</td>
+            <td>${results.total}</td>
+        </tr>`)
         .join('\n');
 
     return `<html>
@@ -83,12 +107,18 @@ function formatScores(scores_object) {
 
                         th, td {
                             padding: 10px;
-                            text-align: left;
+                            text-align: center;
                             border-bottom: 1px solid #ddd;
                         }
 
-                        td:nth-child(2) {
-                            text-align: right;
+                        th:first-child, td:first-child {
+                            text-align: left;
+                        }
+
+                        td.rounds span {
+                            display: inline-block;
+                            width: 20px;
+                            text-align: center;
                         }
                     </style>
                 </head>
@@ -96,7 +126,8 @@ function formatScores(scores_object) {
                     <table>
                         <tr>
                             <th>Team Name</th>
-                            <th>Score</th>
+                            <th>Rounds</th>
+                            <th>Total</th>
                         </tr>
                         ${scores}
                     </table>
