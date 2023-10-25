@@ -23,9 +23,9 @@ server.listen(port, () => {
 });
 
 
-async function getScores() {
+async function getScores(page = 1) {
     // Purpose: Fetches the trivia data from the Geeks Who Drink website and parses it into a JSON object.
-    const response = await fetch('https://www.geekswhodrink.com/wp-admin/admin-ajax.php?action=mb_display_venue_events&pag=1&quiz_id=*&venue=2543192132&team=*');
+    const response = await fetch(`https://www.geekswhodrink.com/wp-admin/admin-ajax.php?action=mb_display_venue_events&pag=${page}&quiz_id=*&venue=2543192132&team=*`);
     const text = await response.text();
 
     // Find tables in the text and turn them into JSON objects.
@@ -46,7 +46,7 @@ async function getScores() {
     // Add the scores together from each table for each team.
     const scores = table_objects.reduce((obj, table, index) => {
         table.forEach(row => {
-            const team_name = row.get('Team Name').trim().toUpperCase();
+            const team_name = row.get('Team Name').replace(/\([^)]+\)/, '').trim().toUpperCase();
 
             // Filter out the duplicate "Centaur rodeo" score from the first week
             if (team_name === 'CENTAUR RODEO' && row.get('Score') === '32') {
