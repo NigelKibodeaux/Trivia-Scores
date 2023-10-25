@@ -29,7 +29,7 @@ async function getScores(page = 1) {
     const text = await response.text();
 
     // Find tables in the text and turn them into JSON objects.
-    const table_text = text.match(/<table.*?>.*?<\/table>/g);
+    const table_text = text.match(/<table.*?>.*?<\/table>/g) || [];
     const table_objects = table_text.map(table => {
         const rows = table.match(/<tr.*?>.*?<\/tr>/g);
         const headers = rows.shift().match(/<th.*?>.*?<\/th>/g).map(header => header.replace(/<.*?>/g, ''));
@@ -44,34 +44,56 @@ async function getScores(page = 1) {
     });
 
     // Add the scores together from each table for each team.
-    const scores = table_objects.reduce((obj, table, index) => {
+    const scores = table_objects.reduce((scores_map, table, index) => {
         table.forEach(row => {
             const team_name = row.get('Team Name').replace(/\([^)]+\)/, '').trim().toUpperCase();
 
             // Filter out the duplicate "Centaur rodeo" score from the first week
             if (team_name === 'CENTAUR RODEO' && row.get('Score') === '32') {
-                return obj;
+                return scores_map;
             }
 
-            if (obj.has(team_name)) {
-                const team_scores = obj.get(team_name);
+            if (scores_map.has(team_name)) {
+                const team_scores = scores_map.get(team_name);
                 team_scores.total += parseInt(row.get('Score'));
                 team_scores.rounds[index] = parseInt(row.get('Score'));
             } else {
                 const rounds = [];
                 rounds[index] = parseInt(row.get('Score'));
-                obj.set(team_name, {
+                scores_map.set(team_name, {
                     total: parseInt(row.get('Score')),
                     rounds,
                 });
             }
         });
-        return obj;
+        return scores_map;
     }, new Map());
 
-    // Replace the empty rounds with 0s
+    // Attempt the next page if this page had results
+    const next_page_scores_map = table_objects.length ? await getScores(page + 1) : new Map();
+
+    // Add the scores from the next page to the current page
+    next_page_scores_map.forEach((value, key, map) => {
+        if (scores.has(key)) {
+            const team_scores = scores.get(key);
+            team_scores.total += value.total;
+            team_scores.rounds = team_scores.rounds.concat(value.rounds);
+        } else {
+            scores.set(key, value);
+        }
+    });
+
+    // Find the highest number of rounds played for any team
+    const total_rounds = [...scores.values()].reduce((rounds, value) => {
+        if (value.rounds.length > rounds) {
+            return value.rounds.length;
+        }
+        return rounds;
+    }, 0);
+
+    // Replace the empty rounds for each team with 0s
     scores.forEach((value, key, map) => {
-        for (let i = 0; i < table_objects.length; i++) {
+        for (let i = 0; i < total_rounds; i++) {
             if (!value.rounds[i]) {
                 value.rounds[i] = 0;
             }
